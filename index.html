@@ -334,8 +334,9 @@ function resolveHome(s, ev){
   if(!bay || bay.filled || bay.gator){ die(s,'hedge',ev); return; }
   bay.filled = true; bay.sip = s.hasSip;
   s.score += 50;
-  const leftover = Math.max(0, Math.min(30, Math.round(s.timeLeft)));
-  s.score += leftover * 10;
+  // arcade Frogger: 10 points for every unused HALF-second on the timer
+  const halves = Math.max(0, Math.min(LIFE_TIME*2, Math.floor(s.timeLeft*2)));
+  s.score += halves * 10;
   if(s.hasSip){ s.score += 200; bay.sip = true; s.hasSip = false; ev.bonus = true; }
   if(s.fly && s.fly.bay===bi){ s.score += 200; s.fly = null; bay.fly = true; ev.bonus = true; }
   s.baysFilled++; s.baysTotal++; ev.bay = true;
