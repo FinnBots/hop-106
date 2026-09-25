@@ -498,7 +498,7 @@ canvas{ touch-action:none; }
 "use strict";
 /* ==========================================================================
    HOP 106 — FinnBots. ENGINE (Free gameplay). A FinnBots-original grid hopper
-   in the Konami-Frogger loop. This is the ONLY per-game script; head, DOM and
+   in the road-and-river crossing loop. This is the ONLY per-game script; head, DOM and
    the wallet layer below are the frozen chassis.
    Contract kept: exports { CFG, RUN, newRun, stepGame } headless (termination
    sim); window.HOP106Engine = { start, idle, resumeFree, state }; run end ->
@@ -624,7 +624,7 @@ function resolveHome(s, ev){
   if(!bay || bay.filled || bay.gator){ die(s,'hedge',ev); return; }
   bay.filled = true; bay.sip = s.hasSip;
   s.score += 50;
-  // arcade Frogger: 10 points for every unused HALF-second on the timer
+  // the arcade original: 10 points for every unused HALF-second on the timer
   const halves = Math.max(0, Math.min(LIFE_TIME*2, Math.floor(s.timeLeft*2)));
   s.score += halves * 10;
   if(s.hasSip){ s.score += 200; bay.sip = true; s.hasSip = false; ev.bonus = true; }
