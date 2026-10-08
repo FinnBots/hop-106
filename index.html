@@ -845,7 +845,11 @@ function spawnForShift(s){
 function mkRng(seed){ let a = seed>>>0 || 1; return function(){ a ^= a<<13; a ^= a>>>17; a ^= a<<5; a>>>=0; return a/4294967296; }; }
 
 function newRun(){
-  const s = { phase:'play', shift:1, score:0, lives:5, baysFilled:0, baysTotal:0,
+  /* `phase` is the CHASSIS TERMINATION CONTRACT and nothing else: play | dead.
+     The death beat used to live in it, and a sub-state parked there is one no
+     driver can see past — every driver in the factory loops `while(phase===
+     "play")`, so each death TRUNCATED the run it was measuring. */
+  const s = { phase:'play', dying:false, shift:1, score:0, lives:5, baysFilled:0, baysTotal:0,
     runMs:0, extraAwarded:false, deathT:0, deathCause:null };
   s.rng = mkRng(0x106);
   s.lanes = buildLanes(1); s.bays = mkBays();
@@ -863,8 +867,8 @@ function checkExtra(s, ev){
 }
 
 function die(s, cause, ev){
-  if(s.phase!=='play') return;
-  s.phase = 'dying'; s.deathT = 650; s.deathCause = cause; s.hasSip = false;
+  if(s.phase!=='play' || s.dying) return;
+  s.dying = true; s.deathT = 650; s.deathCause = cause; s.hasSip = false;
   ev.death = true; ev[cause] = true;
 }
 
@@ -920,7 +924,7 @@ function resolveStanding(s, ev){
 
 // Start a hop if allowed. dir in {'u','d','l','r'}. Returns true if a hop started.
 function tryHop(s, dir){
-  if(s.phase!=='play') return false;
+  if(s.phase!=='play' || s.dying) return false;
   if(s.hop){ s.queued = dir; return false; }         // queue at most one
   let toRow = s.row, toX = s.fx;
   if(dir==='u') toRow = s.row + 1;
@@ -942,9 +946,9 @@ function tryHop(s, dir){
 
 function stepGame(s, dtMs){
   const ev = {};
-  if(s.phase==='dying'){
+  if(s.dying){
     s.deathT -= dtMs; s.runMs += dtMs;
-    if(s.deathT <= 0){ s.lives--; if(s.lives <= 0){ s.phase='dead'; ev.over = true; } else { s.phase='play'; resetLife(s); } }
+    if(s.deathT <= 0){ s.lives--; s.dying=false; if(s.lives <= 0){ s.phase='dead'; ev.over = true; } else { resetLife(s); } }
     return ev;
   }
   if(s.phase!=='play') return ev;
@@ -990,14 +994,14 @@ function stepGame(s, dtMs){
   if(s.hop){
     s.hop.t += dtMs;
     if(s.hop.t >= s.hop.dur){ s.fx = s.hop.toX; s.row = s.hop.toRow; s.hop = null; resolveLanding(s, ev);
-      if(s.phase==='play' && s.queued){ const q = s.queued; s.queued = null; tryHop(s, q); } }
+      if(s.phase==='play' && !s.dying && s.queued){ const q = s.queued; s.queued = null; tryHop(s, q); } }
   } else {
     if(s.lanes[s.row].kind==='river') s.fx += s.lanes[s.row].vx * dtScale;  // ride the platform
     resolveStanding(s, ev);
   }
 
   // timer (only while a hop-life is live)
-  if(s.phase==='play'){
+  if(s.phase==='play' && !s.dying){
     s.timeLeft -= dtMs/1000;
     const sec = Math.ceil(s.timeLeft);
     if(s.timeLeft<=10 && sec!==s._lastBeep && sec>0){ s._lastBeep = sec; ev.beep = true; }
@@ -1217,7 +1221,7 @@ if(!HEADLESS){
     let fx=s.fx, ry=s.row, arc=0;
     if(s.hop){ const k=s.hop.t/s.hop.dur; fx=s.hop.fromX+(s.hop.toX-s.hop.fromX)*k; ry=s.hop.fromRow+(s.hop.toRow-s.hop.fromRow)*k; arc=Math.sin(k*Math.PI)*6; }
     const px=fx, py=rowY(ry)-arc;
-    if(s.phase==='dying'){ const blink=Math.floor(Date.now()/80)%2;
+    if(s.dying){ const blink=Math.floor(Date.now()/80)%2;
       rr(px+1,py+1,TILE-2,TILE-2, blink?'#ff3b30':'#ffd23a'); }
     else { drawHero(px,py,s.face); if(s.hasSip) rr(px+4,py-3,4,4,'#ff5da2'); }
     // timer bar
@@ -1230,7 +1234,7 @@ if(!HEADLESS){
   // ---- loop ----
   let last=performance.now(), acc=0; const TICK=1000/60;
   function frame(now){ let dt=now-last; last=now; if(dt>200)dt=200;
-    if(active && (s.phase==='play'||s.phase==='dying') && !rulesO.classList.contains('show')){
+    if(active && s.phase!=='dead' && !rulesO.classList.contains('show')){
       acc+=dt; let guard=0;
       while(acc>=TICK && guard<6){ acc-=TICK; const ev=stepGame(s,TICK); emitSfx(ev); guard++; if(s.phase==='dead') break; }
     } else acc=0;
